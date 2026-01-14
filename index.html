@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2c3e50" />
+  <meta name="description" content="Calculadora interna para asesores financieros" />
+  <title>Calculadora principal</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232c3e50' width='192' height='192'/><text x='50%' y='50%' font-size='100' fill='white' text-anchor='middle' dominant-baseline='middle'>$</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 520px;
+      width: 100%;
+      padding: 30px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 15px;
+    }
+
+    h1 { color: #2c3e50; font-size: 28px; margin-bottom: 5px; }
+
+    .subtitle { color: #7f8c8d; font-size: 14px; }
+
+    .form-group { margin-bottom: 20px; }
+
+    label {
+      display: block;
+      color: #2c3e50;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ecf0f1;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus { outline: none; border-color: #667eea; }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      margin-top: 10px;
+    }
+
+    button:active { transform: scale(0.98); }
+
+    .results {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .results.show { display: block; }
+
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #ecf0f1;
+      align-items: center;
+    }
+
+    .result-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .result-label { color: #7f8c8d; font-weight: 600; }
+
+    .result-value { color: #2c3e50; font-weight: 700; font-size: 16px; text-align: right; }
+
+    .install-btn {
+      background: #27ae60;
+      margin-top: 20px;
+      display: none;
+    }
+
+    .install-btn.show { display: block; }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #7f8c8d;
+      line-height: 1.4;
+    }
+
+    .max-loan {
+      font-size: 22px;
+      font-weight: 800;
+      text-decoration: underline;
+      line-height: 1.2;
+    }
+
+    .max-loan-wrap {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 2px solid #ecf0f1;
+      margin-top: 8px;
+    }
+
+    .max-loan-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #7f8c8d;
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 20px; }
+      h1 { font-size: 24px; }
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>💰 Calculadora principal</h1>
+      <p class="subtitle">Herramienta comparativa de financieras</p>
+    </header>
+
+    <form id="loanForm">
+      <div class="form-group">
+        <label for="capacity">Capacidad de pago por quincena (MXN)</label>
+        <input type="number" id="capacity" placeholder="(Opcional) 1500" min="0">
+      </div>
+
+      <div class="form-group">
+        <label for="amount">Monto solicitado (MXN)</label>
+        <input type="number" id="amount" placeholder="(Opcional) 20000" min="0">
+        <p class="hint">Si dejas el monto vacío, calculo el MONTO MÁXIMO según tu capacidad y plazo.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="term">Plazo (quincenas)</label>
+        <input type="number" id="term" placeholder="24" min="1" required>
+        <p class="hint">Tip: usa plazos que existan en tu tabulador (ej. 12, 18, 24, 30...).</p>
+      </div>
+
+      <div class="form-group">
+        <label for="age">Edad del cliente</label>
+        <input type="number" id="age" placeholder="(Opcional) 35" min="18" max="99">
+      </div>
+
+      <div class="form-group">
+        <label for="serviceYears">Años de servicio / antigüedad laboral</label>
+        <input type="number" id="serviceYears" placeholder="(Opcional) 5" min="0" step="0.5">
+      </div>
+
+      <div class="form-group">
+        <label for="convenio">Convenio</label>
+        <select id="convenio" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+        </select>
+      </div>
+
+      <button type="submit">Ver opciones</button>
+      <button type="button" class="install-btn" id="installBtn">Instalar app</button>
+    </form>
+
+    <div class="results" id="results">
+      <div id="options"></div>
+    </div>
+  </div>
+  <div class="results" id="rejectedBox" style="display:none; margin-top: 12px;">
+    <div id="rejected"></div>
+  </div>
+
+  <script>
+  // ====== PWA (instalación) ======
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .catch(err => console.log('SW registration failed:', err));
+  }
+
+  let deferredPrompt;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('installBtn').classList.add('show');
+  });
+
+  document.getElementById('installBtn').addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('installBtn').classList.remove('show');
+    }
+  });
+
+  // ====== Cargar data.json ======
+  let DATA = null;
+
+  async function cargarDatos() {
+    const res = await fetch('data.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudo cargar data.json');
+    DATA = await res.json();
+    if (!DATA?.financieras || !Array.isArray(DATA.financieras)) {
+      throw new Error('data.json no tiene el formato esperado: { "financieras": [...] }');
+    }
+  }
+
+  function money(n) {
+    if (!isFinite(n)) return '-';
+    return n.toLocaleString('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  // ====== Tabulador fijo: (monto exacto + plazo exacto => pago quincenal) ======
+  function buscarPago(fin, monto, plazoStr) {
+    if (!fin.tabla || !Array.isArray(fin.tabla)) return null;
+
+    const fila = fin.tabla.find(r => Number(r.monto) === Number(monto));
+    if (!fila) return null;
+
+    const pago = fila.plazos?.[plazoStr];
+    if (pago == null) return null;
+
+    return Number(pago);
+  }
+
+  // ====== Validación de reglas (soporta edad/servicio opcionales) ======
+  function cumpleReglas(fin, edad, servicio, plazoQuincenas) {
+    const r = fin.reglas || {};
+
+    // Si NO hay edad, no filtramos por edad
+    if (edad != null) {
+      if (r.edadMin != null && edad < r.edadMin) return false;
+
+      if (!r.edadIncluyePlazo) {
+        if (r.edadMax != null && edad > r.edadMax) return false;
+      } else if (r.edadMax != null) {
+        const edadAlFinal = edad + (plazoQuincenas / 24);
+        if (edadAlFinal > r.edadMax) return false;
+      }
+    }
+
+    // Si NO hay servicio, no filtramos por servicio
+    if (servicio != null) {
+      if (r.servicioMin != null && servicio < r.servicioMin) return false;
+      if (r.servicioMax != null && servicio > r.servicioMax) return false;
+
+      // Riesgo jubilación solo si hay edad y servicio
+      if (edad != null && r.riesgoJubilacion?.aplica) {
+        for (const lim of (r.riesgoJubilacion.limites || [])) {
+          if (servicio >= lim.servicioAnios && edad >= lim.edadMin) return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // ====== Buscar monto máximo por capacidad ======
+  function buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad) {
+    if (!fin.tabla || !Array.isArray(fin.tabla)) return null;
+    if (capacidad == null || !isFinite(capacidad)) return null;
+
+    let mejor = null; // { monto, pagoQ }
+
+    for (const fila of fin.tabla) {
+      const pago = fila.plazos?.[plazoStr];
+      if (pago == null) continue;
+
+      const pagoQ = Number(pago);
+      const monto = Number(fila.monto);
+
+      if (!isFinite(pagoQ) || !isFinite(monto)) continue;
+
+      // Si cabe en la capacidad, buscamos el monto más alto
+      if (pagoQ <= capacidad) {
+        if (!mejor || monto > mejor.monto) {
+          mejor = { monto, pagoQ };
+        }
+      }
+    }
+
+    return mejor; // null si nada cabe
+  }
+
+  // ====== Evento principal ======
+  document.getElementById('loanForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    try {
+      if (!DATA) await cargarDatos();
+
+      const capacidadRaw = document.getElementById('capacity').value.trim();
+      const montoRaw = document.getElementById('amount').value.trim();
+      const edadRaw = document.getElementById('age').value.trim();
+      const servicioRaw = document.getElementById('serviceYears').value.trim();
+
+      const capacidad = capacidadRaw === '' ? null : Number(capacidadRaw);
+      const monto = montoRaw === '' ? null : Number(montoRaw);
+      const edad = edadRaw === '' ? null : Number(edadRaw);
+      const servicio = servicioRaw === '' ? null : Number(servicioRaw);
+
+      const plazo = Number(document.getElementById('term').value);
+      const plazoStr = String(plazo);
+
+      const contenedor = document.getElementById('options');
+      const rechazadosCont = document.getElementById('rejected');
+      const rechazadosBox = document.getElementById('rejectedBox');
+
+      contenedor.innerHTML = '';
+      rechazadosCont.innerHTML = '';
+      rechazadosBox.style.display = 'none';
+
+      const resultados = [];
+      const rechazados = [];
+
+      // Helpers para motivos
+      const addReject = (fin, motivo) => rechazados.push({ fin, motivo });
+
+      // Validación con motivo
+      function motivoReglas(fin, edad, servicio, plazoQ) {
+        const r = fin.reglas || {};
+
+        // Si hay edad, validar reglas de edad
+        if (edad != null) {
+          if (r.edadMin != null && edad < r.edadMin) {
+            return `No cumple edad mínima (${r.edadMin}).`;
+          }
+
+          // edad máxima normal
+          if (!r.edadIncluyePlazo) {
+            if (r.edadMax != null && edad > r.edadMax) {
+              return `Excede edad máxima (${r.edadMax}).`;
+            }
+          } else if (r.edadMax != null) {
+            const edadFinal = edad + (plazoQ / 24);
+            if (edadFinal > r.edadMax) {
+              return `Edad al finalizar (${edadFinal.toFixed(1)}) excede máximo (${r.edadMax}).`;
+            }
+          }
+        }
+
+        // Si hay servicio, validar reglas de servicio
+        if (servicio != null) {
+          if (r.servicioMin != null && servicio < r.servicioMin) {
+            return `No cumple antigüedad mínima (${r.servicioMin} años).`;
+          }
+          if (r.servicioMax != null && servicio > r.servicioMax) {
+            return `Excede antigüedad máxima (${r.servicioMax} años).`;
+          }
+
+          // Riesgo jubilación solo si hay edad y servicio
+          if (edad != null && r.riesgoJubilacion?.aplica) {
+            for (const lim of (r.riesgoJubilacion.limites || [])) {
+              if (servicio >= lim.servicioAnios && edad >= lim.edadMin) {
+                return `Riesgo jubilación (≥${lim.servicioAnios} años servicio y ≥${lim.edadMin} años).`;
+              }
+            }
+          }
+        }
+
+        return null; // OK
+      }
+
+      for (const fin of DATA.financieras) {
+        // 1) Reglas edad/servicio (si están vacías no filtran)
+        if (!cumpleReglas(fin, edad, servicio, plazo)) continue;
+
+        // 2) Plazos permitidos
+        if (Array.isArray(fin.plazosPermitidos) && !fin.plazosPermitidos.includes(plazo)) continue;
+
+        let pagoQ = null;
+        let montoUsado = monto;
+
+        // ===== MODO B: monto vacío -> calcular monto máximo con capacidad =====
+        if (monto == null) {
+          if (capacidad == null) continue; // sin capacidad no se puede calcular monto máximo
+          const best = buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad);
+          if (!best) continue;
+
+          montoUsado = best.monto;
+          pagoQ = best.pagoQ;
+        } 
+        // ===== MODO A: monto definido -> buscar pago por tabulador =====
+        else {
+          // Montos min/max
+          if (fin.montoMin != null && monto < Number(fin.montoMin)) continue;
+          if (fin.montoMax != null && monto > Number(fin.montoMax)) continue;
+
+          pagoQ = buscarPago(fin, monto, plazoStr);
+          if (pagoQ == null) continue;
+        }
+
+        // 3) Capacidad (opcional):
+        const pasa = (capacidad == null) ? null : (pagoQ <= capacidad);
+
+        resultados.push({ fin, pagoQ, pasa, montoUsado });
+      }
+
+      // Ordena: primero las que sí pasan capacidad, luego por menor pago
+      resultados.sort((a, b) => {
+        // Si no hay capacidad, solo ordena por pago
+        if (capacidad == null) return a.pagoQ - b.pagoQ;
+
+        // Si hay capacidad, primero los que pasan (pasa=true), luego por pago
+        const aRank = a.pasa ? 0 : 1;
+        const bRank = b.pasa ? 0 : 1;
+        if (aRank !== bRank) return aRank - bRank;
+        return a.pagoQ - b.pagoQ;
+      });
+
+      // Render opciones
+      if (resultados.length === 0) {
+        contenedor.innerHTML = `
+          <div class="result-item">
+            <span class="result-label">Sin opciones disponibles</span>
+            <span class="result-value">Revisa reglas / monto / plazo</span>
+          </div>
+        `;
+      } else {
+        for (const r of resultados) {
+          const badge = (r.pasa === null) ? '' : (r.pasa ? '✅' : '❌');
+          const esModoMontoMax = (monto == null); // monto vacío => modo monto máximo
+
+          contenedor.innerHTML += `
+            <div class="result-item" style="flex-direction:column; align-items:flex-start;">
+              <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
+                <span class="result-label">${r.fin.nombre ?? 'Financiera'}</span>
+                <span class="result-value">${money(r.pagoQ)} / quincena ${badge}</span>
+              </div>
+
+              ${
+                esModoMontoMax
+                  ? `
+                    <div class="max-loan-wrap">
+                      <div class="max-loan">Monto máximo: ${money(r.montoUsado)}</div>
+                      <div class="max-loan-sub">Plazo: ${plazo}Q · Con capacidad: ${capacidad == null ? '-' : money(capacidad)}</div>
+                    </div>
+                  `
+                  : `
+                    <div class="hint" style="margin-top:6px;">
+                      Monto evaluado: <b>${money(r.montoUsado)}</b> — Plazo: <b>${plazo}Q</b>
+                    </div>
+                  `
+              }
+              ${r.fin.notas ? `<div class="hint" style="margin-top:6px;">${r.fin.notas}</div>` : ''}
+            </div>
+          `;
+        }
+      }
+
+      // Render rechazadas (motivos)
+      if (rechazados.length > 0) {
+        rechazadosBox.style.display = 'block';
+        rechazadosCont.innerHTML = `
+          <div class="result-item" style="border-bottom: none; padding-bottom: 6px;">
+            <span class="result-label">Financieras descartadas</span>
+            <span class="result-value">${rechazados.length}</span>
+          </div>
+        `;
+
+        for (const r of rechazados) {
+          rechazadosCont.innerHTML += `
+            <div class="result-item" style="align-items:flex-start;">
+              <span class="result-label">${r.fin.nombre ?? 'Financiera'}</span>
+              <span class="result-value" style="font-weight:600; color:#7f8c8d; max-width: 65%;">
+                ${r.motivo}
+              </span>
+            </div>
+          `;
+        }
+      }
+
+      document.getElementById('results').classList.add('show');
+
+    } catch (err) {
+      console.error(err);
+      alert('Error: ' + err.message);
+    }
+  });
+  </script>
+</body>
+</html>

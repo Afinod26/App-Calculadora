@@ -399,6 +399,10 @@
         const edadAlFinal = edad + (plazoQuincenas / 24);
         if (edadAlFinal > r.edadMax) return false;
       }
+
+      // Validación: edad actual + duración del crédito (en años) ≤ 67
+      const edadAlFinal = edad + (plazoQuincenas / 24);
+      if (edadAlFinal > 67) return false;
     }
 
     // Si NO hay servicio, no filtramos por servicio
@@ -511,6 +515,12 @@
                 return `Edad al finalizar (${edadAlFinal.toFixed(1)}) excede máximo (${r.edadMax}).`;
               }
             }
+          }
+
+          // Validación: edad actual + duración del crédito (en años) ≤ 67
+          const edadFinal = edad + (plazoQ / 24);
+          if (edadFinal > 67) {
+            return `Edad al finalizar (${edadFinal.toFixed(1)}) excede límite de 67 años.`;
           }
         }
 

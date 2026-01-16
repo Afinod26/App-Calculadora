@@ -1,18 +1,37 @@
 {
+  "financieras": [
+ 
+
+{
   "id": "credifiel_snte23",
   "nombre": "Credifiel",
   "convenio": "snte23",
   "activo": true,
 
   "reglas": {
-    "edad_min": 46,
-    "edad_max": 70,
-    "edad_max_al_finalizar": 70,
-    "antiguedad_min_anios": 5,
-    "plazos_quincenas": [48, 72, 96, 120],
-    "monto_min": 3000,
-    "monto_max": 200000
-  },
+  "edad_min": 18,
+  "edad_max": 70,
+  "edad_max_al_finalizar": 70,
+  "antiguedad_min_anios": 5,
+  "plazos_quincenas": [48, 72, 96, 120],
+  "monto_min": 3000,
+  "monto_max": 200000,
+
+  "tablaEdadServicio": {
+  "tipo": "tramos_max_servicio_por_edadFinal",
+  "tramos": [
+    { "edadFinal": 70, "maxServicio": 10 },
+    { "edadFinal": 69, "maxServicio": 18 },
+    { "edadFinal": 68, "maxServicio": 25 },
+    { "edadFinal": 67, "maxServicio": 27 },
+    { "edadFinal": 66, "maxServicio": 29 },
+    { "edadFinalMax": 65, "maxServicio": 33 }
+  ]
+}
+
+}
+
+,
 
   "tabla": [
     {
@@ -17758,4 +17777,61 @@
   "notasPorConvenio": {
     "snte23": "Importado desde TABLA SNTE 23 Credifiel.pdf."
   }
+},
+{
+  "id": "vivalia_gobierno",
+  "nombre": "Vivalia",
+  "convenio": ["gobierno"],
+  "activo": true,
+  "reglas": {
+    "edad_min": null,
+    "edad_max": null,
+    "edad_max_al_finalizar": null,
+    "antiguedad_min_anios": null,
+    "plazos_quincenas": [],
+    "monto_min": null,
+    "monto_max": null
+  },
+  "tabla": []
+},
+
+{
+  "id": "nomiflash_gobierno",
+  "nombre": "Nomiflash",
+  "convenio": ["gobierno"],
+  "activo": true,
+  "reglas": {
+    "edad_min": null,
+    "edad_max": null,
+    "edad_max_al_finalizar": null,
+    "antiguedad_min_anios": null,
+    "plazos_quincenas": [],
+    "monto_min": null,
+    "monto_max": null
+  },
+  "tabla": []
+},
+{
+  "id": "divinodinero_gobierno",
+  "nombre": "Divino Dinero",
+  "convenio": ["gobierno"],
+  "activo": true,
+  "reglas": {
+    "edad_min": null,
+    "edad_max": null,
+    "edad_max_al_finalizar": null,
+    "antiguedad_min_anios": null,
+    "plazos_quincenas": [],
+    "monto_min": null,
+    "monto_max": null
+  },
+  "tabla": []
+}
+
+
+
+
+
+
+ ]
 }

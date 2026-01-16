@@ -447,6 +447,93 @@
     return mejor; // null si nada cabe
   }
 
+  // ====== Validación de tabla de edad por servicio (Credifiel) ======
+  function validaTablaEdadCredifiel(fin, edad, servicio) {
+    if (!fin || !edad || !servicio) return null;
+
+    // Solo aplica a Credifiel SNTE 23 y SNTE 51
+    if (fin.id !== "credifiel_snte23" && fin.id !== "credifiel_snte51") return null;
+
+    const mapa = fin.reglas?.tablaEdad?.maxEdadPorServicio || {};
+    const maxDefault = Number(fin.reglas?.tablaEdad?.maxEdadDefault ?? 70);
+
+    let maxEdad = maxDefault;
+
+    // Regla resumida (según la tabla)
+    if (servicio >= 30) maxEdad = 65;
+    else if (servicio === 29) maxEdad = 66;
+    else if (servicio === 28) maxEdad = 67;
+    else if (mapa[String(servicio)] != null) maxEdad = Number(mapa[String(servicio)]);
+
+    if (edad > maxEdad) return `Excede edad máxima (${maxEdad}) para ${servicio} años de servicio.`;
+    return null;
+  }
+
+  // ====== Validación de años de servicio máximo por edad (Credifiel) ======
+  // ====== Helper para búsqueda de tramos ======
+  function maxServicioPorEdadFinal_Tramos(tramos, edadFinal) {
+    // prioridad:
+    // 1) tramo exacto (edadFinal)
+    // 2) rango por min (edadFinalMin)
+    // 3) rango por max (edadFinalMax)
+
+    // exactos primero
+    for (const t of tramos) {
+      if (t.edadFinal != null && Number(t.edadFinal) === edadFinal) return Number(t.maxServicio);
+    }
+    // luego min
+    for (const t of tramos) {
+      if (t.edadFinalMin != null && edadFinal >= Number(t.edadFinalMin)) return Number(t.maxServicio);
+    }
+    // luego max
+    for (const t of tramos) {
+      if (t.edadFinalMax != null && edadFinal <= Number(t.edadFinalMax)) return Number(t.maxServicio);
+    }
+    return null;
+  }
+
+  function validaTablaEdadServicioCredifiel(fin, edad, servicio, plazo) {
+    if (edad == null || servicio == null || plazo == null) return null;
+
+    // Solo aplica a Credifiel SNTE 23 y 51
+    if (fin.id !== "credifiel_snte23" && fin.id !== "credifiel_snte51") return null;
+
+    const cfg = fin.reglas?.tablaEdadServicio;
+    if (!cfg) return null;
+
+    // 👉 usar edad al finalizar
+    const edadFinal = Math.ceil(edad + (plazo / 24));
+
+    // TIPO 1: Tabla discreta (maxServicioPorEdad)
+    if (cfg.tipo === "maxServicioPorEdad") {
+      const edadKey = String(edadFinal);
+      const maxMap = cfg.maxServicioPorEdad || {};
+      const maxServicio = maxMap[edadKey];
+
+      if (maxServicio == null) return null;
+      if (servicio > Number(maxServicio)) return "Excede años de servicio";
+    }
+    
+    // TIPO 2: Fórmula diagonal (80 - edadFinal)
+    else if (cfg.tipo === "diagonal_80_menos_edadFinal") {
+      let maxServicio = 80 - edadFinal;
+      if (maxServicio > 33) maxServicio = 33;
+      if (maxServicio < 5) maxServicio = 5;
+
+      if (servicio > maxServicio) return "Excede años de servicio";
+    }
+
+    // TIPO 3: Tramos (maxServicioPorEdad_Tramos)
+    else if (cfg.tipo === "tramos_max_servicio_por_edadFinal") {
+      const maxServ = maxServicioPorEdadFinal_Tramos(cfg.tramos || [], edadFinal);
+
+      if (maxServ == null) return null;
+      if (servicio > maxServ) return `Excede años de servicio (máx ${maxServ} para edad final ${edadFinal})`;
+    }
+
+    return null;
+  }
+
   // ====== Evento principal ======
   const form = document.getElementById('loanForm');
   if (!form) {
@@ -493,65 +580,41 @@
       const addReject = (fin, motivo) => rechazados.push({ fin, motivo });
 
       // Validación con motivo (devuelve string motivo o null si cumple)
-      function motivoReglas(fin, edad, servicio, plazoQ) {
+      function motivoReglas(fin, edad, servicio, plazo) {
         const r = fin.reglas || {};
 
-        // Si hay edad, validar reglas de edad
-        if (edad != null) {
-          if (r.edadMin != null && edad < r.edadMin) {
-            return `No cumple edad mínima (${r.edadMin}).`;
-          }
+        // 1️⃣ TABLA EDAD–SERVICIO (SOLO CREDIFIEL)
+        const motTabla = validaTablaEdadCredifiel(fin, edad, servicio);
+        if (motTabla) return motTabla;
 
-          // ✅ CASO 1: regla "edad máxima al finalizar" (Mi Dinerito)
-          // acepta cualquiera de estas llaves: edadMaxFinal | edadFinalMax | edadMaxAlFinal
-          const edadMaxFinal = (r.edadMaxFinal ?? r.edadFinalMax ?? r.edadMaxAlFinal);
+        // 1️⃣.5️⃣ TABLA SERVICIO–EDAD (SOLO CREDIFIEL)
+        const motTablaServicio = validaTablaEdadServicioCredifiel(fin, edad, servicio, plazo);
+        if (motTablaServicio) return motTablaServicio;
 
-          if (edadMaxFinal != null) {
-            const edadFinal = edad + (plazoQ / 24);
-            if (edadFinal > Number(edadMaxFinal)) {
-              return `Edad al finalizar (${edadFinal.toFixed(1)}) excede máximo (${edadMaxFinal}).`;
-            }
-          } else {
-            // ✅ CASO 2: regla normal (edadMax) con o sin incluir plazo
-            if (!r.edadIncluyePlazo) {
-              if (r.edadMax != null && edad > r.edadMax) {
-                return `Excede edad máxima (${r.edadMax}).`;
-              }
-            } else if (r.edadMax != null) {
-              const edadAlFinal = edad + (plazoQ / 24);
-              if (edadAlFinal > r.edadMax) {
-                return `Edad al finalizar (${edadAlFinal.toFixed(1)}) excede máximo (${r.edadMax}).`;
-              }
-            }
-          }
+        // 2️⃣ EDAD MÍNIMA
+        if (r.edad_min != null && edad != null && edad < r.edad_min) {
+          return "Edad mínima no cumple";
+        }
 
-          // Validación: edad actual + duración del crédito (en años) ≤ 67
-          const edadFinal = edad + (plazoQ / 24);
-          if (edadFinal > 67) {
-            return `Edad al finalizar (${edadFinal.toFixed(1)}) excede límite de 67 años.`;
+        // 3️⃣ EDAD MÁXIMA (SOLO SI EXISTE)
+        if (r.edad_max != null && edad != null && edad > r.edad_max) {
+          return "Edad máxima excedida";
+        }
+
+        // 4️⃣ EDAD AL FINALIZAR
+        if (r.edad_max_al_finalizar != null && edad != null && plazo != null) {
+          const edadFinal = edad + (plazo / 24);
+          if (edadFinal > r.edad_max_al_finalizar) {
+            return "Edad al finalizar excede límite";
           }
         }
 
-        // Si hay servicio, validar reglas de servicio
-        if (servicio != null) {
-          if (r.servicioMin != null && servicio < r.servicioMin) {
-            return `No cumple antigüedad mínima (${r.servicioMin} años).`;
-          }
-          if (r.servicioMax != null && servicio > r.servicioMax) {
-            return `Excede antigüedad máxima (${r.servicioMax} años).`;
-          }
-
-          // Riesgo jubilación solo si hay edad y servicio
-          if (edad != null && r.riesgoJubilacion?.aplica) {
-            for (const lim of (r.riesgoJubilacion.limites || [])) {
-              if (servicio >= lim.servicioAnios && edad >= lim.edadMin) {
-                return `Riesgo jubilación (≥${lim.servicioAnios} años servicio y ≥${lim.edadMin} años).`;
-              }
-            }
-          }
+        // 5️⃣ ANTIGÜEDAD
+        if (r.antiguedad_min_anios != null && servicio != null && servicio < r.antiguedad_min_anios) {
+          return "Antigüedad insuficiente";
         }
 
-        return null; // OK
+        return null;
       }
 
       // ===============================
@@ -585,6 +648,7 @@
       // ===============================
       if (financierasAProcesar.length === 1 && finSel !== "todas") {
         const fin = financierasAProcesar[0];
+        const nombreFin = fin.nombre || fin.id;
 
         const plazos = getPlazosPermitidos(fin);
         const plazosPermitidos = plazos.map(String);
@@ -626,6 +690,18 @@
           return;
         }
 
+        // ✅ Validar tablas de edad/servicio ANTES de procesar plazos
+        const motTabla = validaTablaEdadServicioCredifiel(fin, edad, servicio, plazo);
+        if (motTabla) {
+          contenedor.innerHTML = `
+            <div class="result-item">
+              <span class="result-label">${fin.nombre}</span>
+              <span class="result-value">${motTabla}</span>
+            </div>`;
+          document.getElementById('results').classList.add('show');
+          return;
+        }
+
         // Render base (mismo estilo)
         let html = `
           <div class="result-item" style="flex-direction:column; align-items:flex-start;">
@@ -638,6 +714,16 @@
 
         // Por cada plazo, calcula
         for (const p of plazos) {
+          const motTabla = validaTablaEdadServicioCredifiel(fin, edad, servicio, p);
+          if (motTabla) {
+            html += `
+              <div class="result-item">
+                <span class="result-label">${p}Q</span>
+                <span class="result-value" style="color:#7f8c8d;font-weight:600;">${motTabla}</span>
+              </div>`;
+            continue;
+          }
+
           const mot = motivoReglas(fin, edad, servicio, p);
           if (mot) {
             html += `
@@ -653,16 +739,18 @@
             const pagoQ = buscarPago(fin, monto, String(p));
             if (pagoQ == null) {
               html += `
-                <div class="result-item">
-                  <span class="result-label">${p}Q</span>
-                  <span class="result-value" style="color:#7f8c8d;font-weight:600;">No existe en tabla</span>
+                <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
+                  <span class="result-value" style="color:#7f8c8d;font-weight:600; text-align:right;">No existe en tabla</span>
                 </div>`;
               continue;
             }
             html += `
-              <div class="result-item">
-                <span class="result-label">${p}Q</span>
-                <span class="result-value">${money(pagoQ)} / quincena</span>
+              <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                <span class="result-label" style="width:70px;">${p}Q</span>
+                <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
+                <span class="result-value" style="text-align:right;">${money(pagoQ)} / quincena</span>
               </div>`;
           } else {
             // monto máximo por capacidad
@@ -678,8 +766,9 @@
             html += `
               <div class="result-item" style="flex-direction:column; align-items:flex-start;">
                 <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
-                  <span class="result-label">${p}Q</span>
-                  <span class="result-value">${money(best.pagoQ)} / quincena</span>
+                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
+                  <span class="result-value" style="text-align:right;">${money(best.pagoQ)} / quincena</span>
                 </div>
                 <div class="max-loan-wrap">
                   <div class="max-loan">Monto máximo: ${money(best.monto)}</div>
@@ -803,9 +892,9 @@
 
         for (const r of rechazados) {
           rechazadosCont.innerHTML += `
-            <div class="result-item" style="align-items:flex-start;">
-              <span class="result-label">${r.fin.nombre ?? 'Financiera'}</span>
-              <span class="result-value" style="font-weight:600; color:#7f8c8d; max-width: 65%;">
+            <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+              <span class="result-label" style="width:100px;">${r.fin.nombre ?? 'Financiera'}</span>
+              <span class="result-value" style="color:#7f8c8d;font-weight:600; text-align:right; flex:1;">
                 ${r.motivo}
               </span>
             </div>

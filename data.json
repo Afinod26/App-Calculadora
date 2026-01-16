@@ -3752,6 +3752,33 @@
   ],
   "monto_min": 3000,
   "monto_max": 200000,
+
+  "reglas": {
+  "edad_min": 46,
+  "edad_max": 70,
+  "edad_max_al_finalizar": 70,
+  "antiguedad_min_anios": 5,
+  "plazos_quincenas": [48, 72, 96, 120],
+  "monto_min": 3000,
+  "monto_max": 200000,
+
+ "tablaEdadServicio": {
+  "tipo": "tramos_max_servicio_por_edadFinal",
+  "tramos": [
+    { "edadFinal": 70, "maxServicio": 10 },
+    { "edadFinal": 69, "maxServicio": 18 },
+    { "edadFinal": 68, "maxServicio": 25 },
+    { "edadFinal": 67, "maxServicio": 27 },
+    { "edadFinal": 66, "maxServicio": 29 },
+    { "edadFinalMax": 65, "maxServicio": 33 }
+  ]
+}
+
+
+  
+}
+
+,
   "tabla": [
           {
             "monto": 3000,
@@ -21493,7 +21520,7 @@
             }
           }
             ],
-      "notas": "Tabla completa desde PDF. Edad máxima 65 al finalizar.",
+      "notas": "Tabla completa desde PDF. Edad máxima 70 al finalizar.",
       "convenios": [
         "snte51"
       ]

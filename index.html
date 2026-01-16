@@ -277,6 +277,8 @@
     const sel = document.getElementById("selFinancieras");
     if (!sel) return;
 
+    const convenioSel = document.getElementById("convenio").value;
+
     sel.innerHTML = "";
 
     // ✅ opción "todas"
@@ -285,7 +287,13 @@
     optAll.textContent = "Todas (comparar)";
     sel.appendChild(optAll);
 
-    DATA.financieras.forEach(fin => {
+    const disponibles = DATA.financieras.filter(fin => {
+      // Si la financiera NO define convenios -> se asume que aplica a todos
+      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) return true;
+      return fin.convenios.includes(convenioSel);
+    });
+
+    disponibles.forEach(fin => {
       const opt = document.createElement("option");
       opt.value = fin.id;
       opt.textContent = fin.nombre;
@@ -731,6 +739,11 @@
   window.addEventListener('DOMContentLoaded', async () => {
     try {
       await cargarDatos(); // aquí se llena el select de convenios
+      
+      // ✅ Actualizar financieras cuando cambia el convenio
+      document.getElementById("convenio").addEventListener("change", () => {
+        poblarSelectorFinancieras();
+      });
     } catch (err) {
       console.error(err);
       alert('Error cargando data.json');

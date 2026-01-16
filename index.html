@@ -290,37 +290,36 @@
     });
   }
 
+  // ====== Helper para obtener convenios de una financiera ======
+  function getConvenios(fin) {
+    // soporta: convenios: ["snte51"]  ó  convenio: "snte51"  ó  convenio: ["snte51"]
+    if (Array.isArray(fin.convenios)) return fin.convenios;
+    if (Array.isArray(fin.convenio)) return fin.convenio;
+    if (typeof fin.convenio === "string") return [fin.convenio];
+    return [];
+  }
+
+  // ====== Filtrar financieras por convenio seleccionado ======
+  function filtrarFinancierasPorConvenio(data, convenioSel) {
+    if (convenioSel === "todas") return data.financieras;
+    return data.financieras.filter(f => getConvenios(f).includes(convenioSel));
+  }
+
   function poblarSelectorFinancieras() {
     const sel = document.getElementById("selFinancieras");
     if (!sel) return;
 
     const convenioSel = document.getElementById("convenio").value;
 
-    sel.innerHTML = "";
+    sel.innerHTML = '<option value="todas">Todas</option>';
 
-    // ✅ opción "todas"
-    const optAll = document.createElement("option");
-    optAll.value = ""; // vacío = todas
-    optAll.textContent = "Todas (comparar)";
-    sel.appendChild(optAll);
-
-    const disponibles = DATA.financieras.filter(fin => {
-      // Si la financiera NO define convenios -> se asume que aplica a todos
-      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) {
-        // Revisar si tiene convenio singular
-        if (fin.convenio && fin.convenio === convenioSel) return true;
-        // Si no tiene ni convenios ni convenio, aplica a todos
-        if (!fin.convenio) return true;
-        return false;
-      }
-      return fin.convenios.includes(convenioSel);
-    });
+    const disponibles = filtrarFinancierasPorConvenio(DATA, convenioSel);
 
     // Debug logging
     console.table(disponibles.map(f => ({
       id: f.id,
       nombre: f.nombre,
-      convenios: f.convenios
+      convenios: getConvenios(f)
     })));
 
     disponibles.forEach(fin => {
@@ -330,7 +329,7 @@
       sel.appendChild(opt);
     });
 
-    sel.value = ""; // por defecto: todas
+    sel.value = "todas"; // por defecto: todas
   }
 
 
@@ -449,30 +448,39 @@
   }
 
   // ====== Evento principal ======
-  document.getElementById('loanForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+  const form = document.getElementById('loanForm');
+  if (!form) {
+    console.error("No existe #loanForm");
+  } else {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    try {
-      if (!DATA) await cargarDatos();
+      try {
+        if (!DATA) await cargarDatos();
 
-      const capacidadRaw = document.getElementById('capacity').value.trim();
-      const montoRaw = document.getElementById('amount').value.trim();
-      const edadRaw = document.getElementById('age').value.trim();
-      const servicioRaw = document.getElementById('serviceYears').value.trim();
-      const convenioSel = document.getElementById('convenio').value;
+      const capacidadRaw = document.getElementById('capacity')?.value?.trim() ?? '';
+      const montoRaw = document.getElementById('amount')?.value?.trim() ?? '';
+      const edadRaw = document.getElementById('age')?.value?.trim() ?? '';
+      const servicioRaw = document.getElementById('serviceYears')?.value?.trim() ?? '';
+      const convenioSel = document.getElementById('convenio')?.value ?? '';
 
       const capacidad = capacidadRaw === '' ? null : Number(capacidadRaw);
       const monto = montoRaw === '' ? null : Number(montoRaw);
       const edad = edadRaw === '' ? null : Number(edadRaw);
       const servicio = servicioRaw === '' ? null : Number(servicioRaw);
 
-      const plazoRaw = document.getElementById('term').value.trim();
-      const plazo = plazoRaw === "" ? null : Number(plazoRaw);
+      const plazoRaw = document.getElementById('term')?.value?.trim() ?? '';
+      const plazo = plazoRaw === '' ? null : Number(plazoRaw);
       const plazoStr = plazo == null ? null : String(plazo);
 
       const contenedor = document.getElementById('options');
       const rechazadosCont = document.getElementById('rejected');
       const rechazadosBox = document.getElementById('rejectedBox');
+
+      if (!contenedor || !rechazadosCont || !rechazadosBox) {
+        console.error("Falta #options o #rejected o #rejectedBox");
+        return;
+      }
 
       contenedor.innerHTML = '';
       rechazadosCont.innerHTML = '';
@@ -547,29 +555,36 @@
       }
 
       // ===============================
-      // Determinar si hay exactamente una financiera seleccionada
+      // Determinar financieras a procesar
       // ===============================
-      const finSelId = document.getElementById("selFinancieras").value; // "" = todas
-      const finSeleccionada = finSelId
-        ? DATA.financieras.find(f => f.id === finSelId)
-        : null;
+      const finSel = document.getElementById("selFinancieras")?.value ?? 'todas';
+
+      // Las disponibles por convenio
+      const disponibles = filtrarFinancierasPorConvenio(DATA, convenioSel);
+
+      // Clave: si es "todas", procesas todas; si no, solo 1
+      const financierasAProcesar =
+        finSel === "todas"
+          ? disponibles
+          : disponibles.filter(f => f.id === finSel);
+
+      // Si no hay ninguna, muestra error claro
+      if (!financierasAProcesar.length) {
+        console.warn("No hay financieras para procesar", { convenioSel, finSel });
+        contenedor.innerHTML = `
+          <div class="result-item">
+            <span class="result-label">Sin financieras</span>
+            <span class="result-value">No hay financieras disponibles para el convenio seleccionado</span>
+          </div>`;
+        document.getElementById('results').classList.add('show');
+        return;
+      }
 
       // ===============================
       // ✅ MODO A: una financiera seleccionada → mostrar TODOS sus plazos
       // ===============================
-      if (finSeleccionada) {
-        const fin = finSeleccionada;
-
-        // convenio
-        if (Array.isArray(fin.convenios) && fin.convenios.length > 0 && !fin.convenios.includes(convenioSel)) {
-          contenedor.innerHTML = `
-            <div class="result-item">
-              <span class="result-label">No aplica</span>
-              <span class="result-value">${fin.nombre} no aplica para ${convenioSel}</span>
-            </div>`;
-          document.getElementById('results').classList.add('show');
-          return;
-        }
+      if (financierasAProcesar.length === 1 && finSel !== "todas") {
+        const fin = financierasAProcesar[0];
 
         const plazos = getPlazosPermitidos(fin);
         const plazosPermitidos = plazos.map(String);
@@ -679,15 +694,10 @@
         return; // ✅ importantísimo: evita que siga al modo "todas"
       }
 
-      for (const fin of DATA.financieras) {
-        // 0) Filtrar por convenio
-        if (Array.isArray(fin.convenios) && fin.convenios.length > 0) {
-          if (!fin.convenios.includes(convenioSel)) {
-            // si quieres mostrar motivo:
-            addReject(fin, `No aplica para el convenio seleccionado (${convenioSel}).`);
-            continue;
-          }
-        }
+      // ===============================
+      // ✅ MODO B: comparar todas las financieras del convenio
+      // ===============================
+      for (const fin of financierasAProcesar) {
 
         const reglasBase = fin.reglas || {};
         const reglasC = fin.reglasPorConvenio?.[convenioSel] || {};
@@ -809,7 +819,8 @@
       console.error(err);
       alert('Error: ' + err.message);
     }
-  });
+    });
+  }
 
   // ✅ Cargar data.json y mostrar convenios al abrir la app
   window.addEventListener('DOMContentLoaded', async () => {

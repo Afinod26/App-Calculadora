@@ -246,9 +246,26 @@
   let DATA = null;
 
   async function cargarDatos() {
-    const res = await fetch('data.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('No se pudo cargar data.json');
-    DATA = await res.json();
+    const baseRes = await fetch('data.json', { cache: 'no-store' });
+    if (!baseRes.ok) throw new Error('No se pudo cargar data.json');
+    const base = await baseRes.json();
+
+    // Mezcla credifiel_snte23 si existe
+    try {
+      const credRes = await fetch('credifiel_snte23.json', { cache: 'no-store' });
+      if (credRes.ok) {
+        const credifielSNTE23 = await credRes.json();
+        base.financieras = (base.financieras || []).filter(f => f.id !== 'credifiel_snte23');
+        base.financieras.push(credifielSNTE23);
+      } else {
+        console.warn('No se pudo cargar credifiel_snte23.json (status)', credRes.status);
+      }
+    } catch (err) {
+      console.warn('Error cargando credifiel_snte23.json', err);
+    }
+
+    DATA = base;
+    window.DATA = DATA;
 
     // ✅ Validación (incluye convenios)
     if (!DATA?.financieras || !Array.isArray(DATA.financieras)) {
@@ -289,9 +306,22 @@
 
     const disponibles = DATA.financieras.filter(fin => {
       // Si la financiera NO define convenios -> se asume que aplica a todos
-      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) return true;
+      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) {
+        // Revisar si tiene convenio singular
+        if (fin.convenio && fin.convenio === convenioSel) return true;
+        // Si no tiene ni convenios ni convenio, aplica a todos
+        if (!fin.convenio) return true;
+        return false;
+      }
       return fin.convenios.includes(convenioSel);
     });
+
+    // Debug logging
+    console.table(disponibles.map(f => ({
+      id: f.id,
+      nombre: f.nombre,
+      convenios: f.convenios
+    })));
 
     disponibles.forEach(fin => {
       const opt = document.createElement("option");

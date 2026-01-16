@@ -1,8 +1,4 @@
 {
-  "financieras": [
- 
-
-{
   "id": "credifiel_snte23",
   "nombre": "Credifiel",
   "convenio": "snte23",
@@ -17777,61 +17773,4 @@
   "notasPorConvenio": {
     "snte23": "Importado desde TABLA SNTE 23 Credifiel.pdf."
   }
-},
-{
-  "id": "vivalia_gobierno",
-  "nombre": "Vivalia",
-  "convenio": ["gobierno"],
-  "activo": true,
-  "reglas": {
-    "edad_min": null,
-    "edad_max": null,
-    "edad_max_al_finalizar": null,
-    "antiguedad_min_anios": null,
-    "plazos_quincenas": [],
-    "monto_min": null,
-    "monto_max": null
-  },
-  "tabla": []
-},
-
-{
-  "id": "nomiflash_gobierno",
-  "nombre": "Nomiflash",
-  "convenio": ["gobierno"],
-  "activo": true,
-  "reglas": {
-    "edad_min": null,
-    "edad_max": null,
-    "edad_max_al_finalizar": null,
-    "antiguedad_min_anios": null,
-    "plazos_quincenas": [],
-    "monto_min": null,
-    "monto_max": null
-  },
-  "tabla": []
-},
-{
-  "id": "divinodinero_gobierno",
-  "nombre": "Divino Dinero",
-  "convenio": ["gobierno"],
-  "activo": true,
-  "reglas": {
-    "edad_min": null,
-    "edad_max": null,
-    "edad_max_al_finalizar": null,
-    "antiguedad_min_anios": null,
-    "plazos_quincenas": [],
-    "monto_min": null,
-    "monto_max": null
-  },
-  "tabla": []
-}
-
-
-
-
-
-
- ]
 }

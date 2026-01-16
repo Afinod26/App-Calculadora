@@ -325,6 +325,23 @@
     sel.value = def || 'snte23' || sel.value;
   }
 
+  // ====== Obtener plazos permitidos desde diferentes estructuras ======
+  function getPlazosPermitidos(fin) {
+    // 1) explícitos
+    if (Array.isArray(fin.plazos_permitidos)) return fin.plazos_permitidos.map(Number);
+    if (Array.isArray(fin.plazos)) return fin.plazos.map(Number);
+    if (Array.isArray(fin.reglas?.plazos_quincenas)) return fin.reglas.plazos_quincenas.map(Number);
+
+    // 2) inferidos desde tabla {monto, plazos:{...}}
+    const row = (fin.tabla && fin.tabla[0]) || (fin.tabulador && fin.tabulador[0]);
+    if (row?.plazos) return Object.keys(row.plazos).map(Number);
+
+    // 3) inferidos desde tablas separadas {"36":[...], "48":[...]}
+    if (fin.tablas && typeof fin.tablas === "object") return Object.keys(fin.tablas).map(Number);
+
+    return [];
+  }
+
   // ====== Tabulador fijo: (monto exacto + plazo exacto => pago quincenal) ======
   function buscarPago(fin, monto, plazoStr) {
     if (!fin.tabla || !Array.isArray(fin.tabla)) return null;
@@ -514,12 +531,30 @@
           return;
         }
 
-        const plazos = Array.isArray(fin.plazosPermitidos) ? fin.plazosPermitidos : [];
+        const plazos = getPlazosPermitidos(fin);
+        const plazosPermitidos = plazos.map(String);
+        
+        // Debug logging
+        console.log("FIN:", fin.id, fin.nombre);
+        console.log("plazoSel:", document.querySelector('#term').value, typeof document.querySelector('#term').value);
+        console.log("plazosPermitidos:", plazos);
+        
         if (plazos.length === 0) {
           contenedor.innerHTML = `
             <div class="result-item">
               <span class="result-label">${fin.nombre}</span>
               <span class="result-value">Sin plazosPermitidos</span>
+            </div>`;
+          document.getElementById('results').classList.add('show');
+          return;
+        }
+
+        // Validar plazo seleccionado
+        if (plazo != null && !plazos.includes(plazo)) {
+          contenedor.innerHTML = `
+            <div class="result-item">
+              <span class="result-label">${fin.nombre}</span>
+              <span class="result-value">Plazo ${plazo}Q no disponible. Plazos: ${plazos.join(", ")}Q</span>
             </div>`;
           document.getElementById('results').classList.add('show');
           return;
@@ -623,7 +658,8 @@
         if (mot) { addReject(fin, mot); continue; }
 
         // 2) Plazos permitidos
-        if (Array.isArray(fin.plazosPermitidos) && !fin.plazosPermitidos.includes(plazo)) continue;
+        const plazosPermitidos = getPlazosPermitidos(fin).map(String);
+        if (plazosPermitidos.length > 0 && !plazosPermitidos.includes(String(plazo))) continue;
 
         let pagoQ = null;
         let montoUsado = monto;

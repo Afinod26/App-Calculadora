@@ -162,6 +162,20 @@
       <p class="subtitle">Herramienta comparativa de financieras</p>
     </header>
 
+     <div class="form-group">
+        <label for="convenio">Convenio</label>
+        <select id="convenio" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="selFinancieras">Financiera</label>
+        <select id="selFinancieras" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+          <!-- se llena por JS -->
+        </select>
+        <p class="hint">Si eliges una financiera, se mostrarán TODOS sus plazos disponibles.</p>
+      </div>
+
     <form id="loanForm">
       <div class="form-group">
         <label for="capacity">Capacidad de pago por quincena (MXN)</label>
@@ -176,7 +190,7 @@
 
       <div class="form-group">
         <label for="term">Plazo (quincenas)</label>
-        <input type="number" id="term" placeholder="24" min="1" required>
+        <input type="number" id="term" placeholder="24" min="1">
         <p class="hint">Tip: usa plazos que existan en tu tabulador (ej. 12, 18, 24, 30...).</p>
       </div>
 
@@ -190,11 +204,7 @@
         <input type="number" id="serviceYears" placeholder="(Opcional) 5" min="0" step="0.5">
       </div>
 
-      <div class="form-group">
-        <label for="convenio">Convenio</label>
-        <select id="convenio" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
-        </select>
-      </div>
+  
 
       <button type="submit">Ver opciones</button>
       <button type="button" class="install-btn" id="installBtn">Instalar app</button>
@@ -239,9 +249,18 @@
     const res = await fetch('data.json', { cache: 'no-store' });
     if (!res.ok) throw new Error('No se pudo cargar data.json');
     DATA = await res.json();
+
+    // ✅ Validación (incluye convenios)
     if (!DATA?.financieras || !Array.isArray(DATA.financieras)) {
       throw new Error('data.json no tiene el formato esperado: { "financieras": [...] }');
     }
+    if (!DATA?.convenios || !Array.isArray(DATA.convenios)) {
+      throw new Error('data.json no tiene "convenios": [ ... ]');
+    }
+
+    // ✅ AQUI estaba faltando:
+    poblarConvenios();
+    poblarSelectorFinancieras();
   }
 
   function money(n) {
@@ -252,6 +271,50 @@
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  function poblarSelectorFinancieras() {
+    const sel = document.getElementById("selFinancieras");
+    if (!sel) return;
+
+    sel.innerHTML = "";
+
+    // ✅ opción "todas"
+    const optAll = document.createElement("option");
+    optAll.value = ""; // vacío = todas
+    optAll.textContent = "Todas (comparar)";
+    sel.appendChild(optAll);
+
+    DATA.financieras.forEach(fin => {
+      const opt = document.createElement("option");
+      opt.value = fin.id;
+      opt.textContent = fin.nombre;
+      sel.appendChild(opt);
+    });
+
+    sel.value = ""; // por defecto: todas
+  }
+
+
+  // ====== Poblar convenios ======
+  function poblarConvenios() {
+    const sel = document.getElementById('convenio');
+    sel.innerHTML = '';
+
+    const convenios = Array.isArray(DATA.convenios) ? DATA.convenios : [];
+    const def = DATA.defaultConvenio || (convenios[0]?.id ?? '');
+
+    // Ordenar para que SNTE 23 salga primero
+    convenios.sort((a, b) => (a.id === 'snte23' ? -1 : b.id === 'snte23' ? 1 : 0));
+
+    for (const c of convenios) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre;
+      sel.appendChild(opt);
+    }
+
+    sel.value = def || 'snte23' || sel.value;
   }
 
   // ====== Tabulador fijo: (monto exacto + plazo exacto => pago quincenal) ======
@@ -337,14 +400,16 @@
       const montoRaw = document.getElementById('amount').value.trim();
       const edadRaw = document.getElementById('age').value.trim();
       const servicioRaw = document.getElementById('serviceYears').value.trim();
+      const convenioSel = document.getElementById('convenio').value;
 
       const capacidad = capacidadRaw === '' ? null : Number(capacidadRaw);
       const monto = montoRaw === '' ? null : Number(montoRaw);
       const edad = edadRaw === '' ? null : Number(edadRaw);
       const servicio = servicioRaw === '' ? null : Number(servicioRaw);
 
-      const plazo = Number(document.getElementById('term').value);
-      const plazoStr = String(plazo);
+      const plazoRaw = document.getElementById('term').value.trim();
+      const plazo = plazoRaw === "" ? null : Number(plazoRaw);
+      const plazoStr = plazo == null ? null : String(plazo);
 
       const contenedor = document.getElementById('options');
       const rechazadosCont = document.getElementById('rejected');
@@ -416,7 +481,135 @@
         return null; // OK
       }
 
+      // ===============================
+      // Determinar si hay exactamente una financiera seleccionada
+      // ===============================
+      const finSelId = document.getElementById("selFinancieras").value; // "" = todas
+      const finSeleccionada = finSelId
+        ? DATA.financieras.find(f => f.id === finSelId)
+        : null;
+
+      // ===============================
+      // ✅ MODO A: una financiera seleccionada → mostrar TODOS sus plazos
+      // ===============================
+      if (finSeleccionada) {
+        const fin = finSeleccionada;
+
+        // convenio
+        if (Array.isArray(fin.convenios) && fin.convenios.length > 0 && !fin.convenios.includes(convenioSel)) {
+          contenedor.innerHTML = `
+            <div class="result-item">
+              <span class="result-label">No aplica</span>
+              <span class="result-value">${fin.nombre} no aplica para ${convenioSel}</span>
+            </div>`;
+          document.getElementById('results').classList.add('show');
+          return;
+        }
+
+        const plazos = Array.isArray(fin.plazosPermitidos) ? fin.plazosPermitidos : [];
+        if (plazos.length === 0) {
+          contenedor.innerHTML = `
+            <div class="result-item">
+              <span class="result-label">${fin.nombre}</span>
+              <span class="result-value">Sin plazosPermitidos</span>
+            </div>`;
+          document.getElementById('results').classList.add('show');
+          return;
+        }
+
+        // Si monto vacío -> requiere capacidad
+        if (monto == null && capacidad == null) {
+          contenedor.innerHTML = `
+            <div class="result-item">
+              <span class="result-label">${fin.nombre}</span>
+              <span class="result-value">Captura Monto o Capacidad</span>
+            </div>`;
+          document.getElementById('results').classList.add('show');
+          return;
+        }
+
+        // Render base (mismo estilo)
+        let html = `
+          <div class="result-item" style="flex-direction:column; align-items:flex-start;">
+            <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
+              <span class="result-label">${fin.nombre}</span>
+              <span class="result-value">Plazos disponibles: ${plazos.join(", ")}Q</span>
+            </div>
+          </div>
+        `;
+
+        // Por cada plazo, calcula
+        for (const p of plazos) {
+          const mot = motivoReglas(fin, edad, servicio, p);
+          if (mot) {
+            html += `
+              <div class="result-item">
+                <span class="result-label">${p}Q</span>
+                <span class="result-value" style="color:#7f8c8d;font-weight:600;">${mot}</span>
+              </div>`;
+            continue;
+          }
+
+          if (monto != null) {
+            // pago por monto exacto
+            const pagoQ = buscarPago(fin, monto, String(p));
+            if (pagoQ == null) {
+              html += `
+                <div class="result-item">
+                  <span class="result-label">${p}Q</span>
+                  <span class="result-value" style="color:#7f8c8d;font-weight:600;">No existe en tabla</span>
+                </div>`;
+              continue;
+            }
+            html += `
+              <div class="result-item">
+                <span class="result-label">${p}Q</span>
+                <span class="result-value">${money(pagoQ)} / quincena</span>
+              </div>`;
+          } else {
+            // monto máximo por capacidad
+            const best = buscarMontoMaxPorCapacidad(fin, String(p), capacidad);
+            if (!best) {
+              html += `
+                <div class="result-item">
+                  <span class="result-label">${p}Q</span>
+                  <span class="result-value" style="color:#7f8c8d;font-weight:600;">No alcanza monto mínimo</span>
+                </div>`;
+              continue;
+            }
+            html += `
+              <div class="result-item" style="flex-direction:column; align-items:flex-start;">
+                <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
+                  <span class="result-label">${p}Q</span>
+                  <span class="result-value">${money(best.pagoQ)} / quincena</span>
+                </div>
+                <div class="max-loan-wrap">
+                  <div class="max-loan">Monto máximo: ${money(best.monto)}</div>
+                  <div class="max-loan-sub">Con capacidad: ${money(capacidad)}</div>
+                </div>
+              </div>`;
+          }
+        }
+
+        contenedor.innerHTML = html;
+        document.getElementById('results').classList.add('show');
+        return; // ✅ importantísimo: evita que siga al modo "todas"
+      }
+
       for (const fin of DATA.financieras) {
+        // 0) Filtrar por convenio
+        if (Array.isArray(fin.convenios) && fin.convenios.length > 0) {
+          if (!fin.convenios.includes(convenioSel)) {
+            // si quieres mostrar motivo:
+            addReject(fin, `No aplica para el convenio seleccionado (${convenioSel}).`);
+            continue;
+          }
+        }
+
+        const reglasBase = fin.reglas || {};
+        const reglasC = fin.reglasPorConvenio?.[convenioSel] || {};
+        const reglasFinal = { ...reglasBase, ...reglasC };
+
         // 1) Reglas edad/servicio (si están vacías no filtran)
         const mot = motivoReglas(fin, edad, servicio, plazo);
         if (mot) { addReject(fin, mot); continue; }
@@ -531,6 +724,16 @@
     } catch (err) {
       console.error(err);
       alert('Error: ' + err.message);
+    }
+  });
+
+  // ✅ Cargar data.json y mostrar convenios al abrir la app
+  window.addEventListener('DOMContentLoaded', async () => {
+    try {
+      await cargarDatos(); // aquí se llena el select de convenios
+    } catch (err) {
+      console.error(err);
+      alert('Error cargando data.json');
     }
   });
   </script>

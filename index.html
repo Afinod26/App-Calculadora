@@ -651,6 +651,10 @@
         const nombreFin = fin.nombre || fin.id;
 
         const plazos = getPlazosPermitidos(fin);
+        
+        // 👇 Si el usuario seleccionó un plazo, solo mostramos ese
+        const plazosAmostrar = (plazo != null) ? [plazo] : plazos;
+        
         const plazosPermitidos = plazos.map(String);
         
         // Debug logging
@@ -713,7 +717,7 @@
         `;
 
         // Por cada plazo, calcula
-        for (const p of plazos) {
+        for (const p of plazosAmostrar) {
           const motTabla = validaTablaEdadServicioCredifiel(fin, edad, servicio, p);
           if (motTabla) {
             html += `

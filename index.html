@@ -309,7 +309,9 @@ async function cargarDatos() {
 
     // ✅ AQUI estaba faltando:
     poblarConvenios();
+    poblarEstados();           // o poblarConveniosPorEstado si ya la usas
     poblarSelectorFinancieras();
+
   }
 
   function money(n) {
@@ -329,6 +331,12 @@ async function cargarDatos() {
     if (Array.isArray(fin.convenio)) return fin.convenio;
     if (typeof fin.convenio === "string") return [fin.convenio];
     return [];
+  }
+
+  // ====== Filtrar convenios por estado seleccionado ======
+  function filtrarConveniosPorEstado(data, estadoSel) {
+    const convenios = Array.isArray(data.convenios) ? data.convenios : [];
+    return convenios.filter(c => c.estado === estadoSel);
   }
 
   // ====== Filtrar financieras por convenio seleccionado ======
@@ -384,6 +392,26 @@ async function cargarDatos() {
     }
 
     sel.value = def || 'snte23' || sel.value;
+  }
+
+  // ====== Poblar estados ======
+  function poblarEstados() {
+    const sel = document.getElementById('estado');
+    if (!sel) return;
+
+    sel.innerHTML = '';
+
+    const estados = Array.isArray(DATA.estados) ? DATA.estados : [];
+    const def = DATA.defaultEstado || (estados[0]?.id ?? '');
+
+    for (const e of estados) {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.nombre;
+      sel.appendChild(opt);
+    }
+
+    sel.value = def || sel.value;
   }
 
   // ====== Obtener plazos permitidos desde diferentes estructuras ======

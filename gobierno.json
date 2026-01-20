@@ -3,6 +3,7 @@
     {
       "id": "divinodinero_gobierno",
       "nombre": "Divino Dinero",
+      "estado": "puebla",
       "convenio": [
         "gobierno"
       ],

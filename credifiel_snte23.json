@@ -1,6 +1,7 @@
 {
   "id": "credifiel_snte23",
   "nombre": "Credifiel",
+  "estado": "puebla",
   "convenio": "snte23",
   "activo": true,
 

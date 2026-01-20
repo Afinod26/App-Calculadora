@@ -4,7 +4,8 @@
 {
   "id": "midinerito_gobierno",
   "nombre": "Mi Dinerito",
-  "convenios": ["gobierno"],
+  "convenio": ["gobierno" ],
+  "estado": "puebla",
   "montoMin": 5000,
   "montoMax": 200000,
   "plazosPermitidos": [48, 60, 72, 84, 96],
@@ -1889,6 +1890,7 @@
 {
   "id": "pre15na_gobierno",
   "nombre": "Pre15na",
+  "estado": "puebla",
   "convenio": "gobierno",
   "activo": true,
   "plazos_permitidos": [
@@ -3742,6 +3744,7 @@
   {
   "id": "credifiel_snte51",
   "nombre": "Credifiel",
+  "estado": "puebla",
   "convenio": "snte51",
   "activo": true,
   "plazos_permitidos": [
@@ -21529,6 +21532,7 @@
     {
       "id": "midinerito",
       "nombre": "Mi Dinerito",
+      "estado": "puebla",
       "convenio":"snte51",
       "montoMin": 3000,
       "montoMax": 300000,
@@ -23935,6 +23939,7 @@
   {
       "id": "pre15na",
       "nombre": "Pre15na",
+      "estado": "puebla",
       "convenio":"snte51",
       "montoMin": 3000,
       "montoMax": 150000,
@@ -25342,10 +25347,19 @@
     
   ],
   "convenios": [
-    { "id": "snte23", "nombre": "SNTE 23" },
-    { "id": "snte51", "nombre": "SNTE 51" },
-    { "id": "gobierno", "nombre": "Gobierno" }
-  ]
+     { "id": "snte23", "nombre": "SNTE 23", "estado": "puebla" },
+    { "id": "snte51", "nombre": "SNTE 51", "estado": "puebla" },
+    { "id": "gobierno", "nombre": "Gobierno", "estado": "puebla" }
+    
+  ],
+    "estados": [
+  { "id": "puebla", "nombre": "Puebla" }
+],
+"defaultEstado": "puebla"
+
+    
 }
+  
+
   
 

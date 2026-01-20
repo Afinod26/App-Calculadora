@@ -162,20 +162,29 @@
       <p class="subtitle">Herramienta comparativa de financieras</p>
     </header>
 
-     <div class="form-group">
-        <label for="convenio">Convenio</label>
-        <select id="convenio" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
-        </select>
-      </div>
+    <div class="form-group">
+      <label for="estado">Estado</label>
+      <select id="estado"
+        style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+      </select>
+    </div>
 
-      <div class="form-group">
-        <label for="selFinancieras">Financiera</label>
-        <select id="selFinancieras" style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
-          <!-- se llena por JS -->
-        </select>
-        <p class="hint">Si eliges una financiera, se mostrarán TODOS sus plazos disponibles.</p>
-      </div>
+    <div class="form-group">
+      <label for="convenio">Convenio</label>
+      <select id="convenio"
+        style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+      </select>
+    </div>
 
+    <div class="form-group">
+      <label for="selFinancieras">Financiera</label>
+      <select id="selFinancieras"
+        style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+      </select>
+      <p class="hint">Si eliges una financiera, se mostrarán TODOS sus plazos disponibles.</p>
+    </div>
+
+    
     <form id="loanForm">
       <div class="form-group">
         <label for="capacity">Capacidad de pago por quincena (MXN)</label>
@@ -245,27 +254,50 @@
   // ====== Cargar data.json ======
   let DATA = null;
 
-  async function cargarDatos() {
-    const baseRes = await fetch('data.json', { cache: 'no-store' });
-    if (!baseRes.ok) throw new Error('No se pudo cargar data.json');
-    const base = await baseRes.json();
+function upsertFinanciera(arr, obj) {
+  const i = arr.findIndex(x => x.id === obj.id);
+  if (i >= 0) arr[i] = obj;     // reemplaza
+  else arr.push(obj);           // inserta
+}
 
-    // Mezcla credifiel_snte23 si existe
-    try {
-      const credRes = await fetch('credifiel_snte23.json', { cache: 'no-store' });
-      if (credRes.ok) {
-        const credifielSNTE23 = await credRes.json();
-        base.financieras = (base.financieras || []).filter(f => f.id !== 'credifiel_snte23');
-        base.financieras.push(credifielSNTE23);
-      } else {
-        console.warn('No se pudo cargar credifiel_snte23.json (status)', credRes.status);
-      }
-    } catch (err) {
-      console.warn('Error cargando credifiel_snte23.json', err);
+async function cargarDatos() {
+  const baseRes = await fetch('data.json', { cache: 'no-store' });
+  if (!baseRes.ok) throw new Error('No se pudo cargar data.json');
+  const base = await baseRes.json();
+
+  base.financieras = Array.isArray(base.financieras) ? base.financieras : [];
+
+  // === 1) Mezcla credifiel_snte23 (archivo individual) ===
+  try {
+    const credRes = await fetch('credifiel_snte23.json', { cache: 'no-store' });
+    if (credRes.ok) {
+      const credifielSNTE23 = await credRes.json();
+      upsertFinanciera(base.financieras, credifielSNTE23);
+    } else {
+      console.warn('No se pudo cargar credifiel_snte23.json (status)', credRes.status);
     }
+  } catch (err) {
+    console.warn('Error cargando credifiel_snte23.json', err);
+  }
 
-    DATA = base;
-    window.DATA = DATA;
+  // === 2) Mezcla gobierno.json (pack con varias financieras) ===
+  try {
+    const govRes = await fetch('gobierno.json', { cache: 'no-store' });
+    if (govRes.ok) {
+      const govPack = await govRes.json();
+      const extras = Array.isArray(govPack.financieras) ? govPack.financieras : [];
+
+      extras.forEach(fin => upsertFinanciera(base.financieras, fin));
+    } else {
+      console.warn('No se pudo cargar gobierno.json (status)', govRes.status);
+    }
+  } catch (err) {
+    console.warn('Error cargando gobierno.json', err);
+  }
+
+  DATA = base;
+  window.DATA = DATA;
+
 
     // ✅ Validación (incluye convenios)
     if (!DATA?.financieras || !Array.isArray(DATA.financieras)) {
@@ -726,8 +758,7 @@
                 <span class="result-value" style="color:#7f8c8d;font-weight:600;">${motTabla}</span>
               </div>`;
             continue;
-          }
-
+          }  
           const mot = motivoReglas(fin, edad, servicio, p);
           if (mot) {
             html += `
@@ -835,8 +866,7 @@
       // Ordena: primero las que sí pasan capacidad, luego por menor pago
       resultados.sort((a, b) => {
         // Si no hay capacidad, solo ordena por pago
-        if (capacidad == null) return a.pagoQ - b.pagoQ;
-
+        if (capacidad == null) return a.pagoQ - b.pagoQ;        
         // Si hay capacidad, primero los que pasan (pasa=true), luego por pago
         const aRank = a.pasa ? 0 : 1;
         const bRank = b.pasa ? 0 : 1;

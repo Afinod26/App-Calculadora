@@ -1,11 +1,14 @@
 {
-  "financiera": "Vivalia",
-  "convenio": "SNTE 51",
-  "producto": "Saldo global",
+  "financieras": [
+
+{
+  "id": "Vivalia_snte51",
+  "nombre": "Vivalia",
+  "convenio": "snte 51",
   "estado": "puebla",
   "tasa_neta_mensual": 0.0348,
   "descripcion_tasa": "Tasa 3% + IVA, incluye seguro y asistencia",
-  "plazos": [
+  "plazos_permitidos": [
     18,
     24,
     36,
@@ -326,3 +329,6 @@
     }
   ]
 }
+
+  ]
+} 

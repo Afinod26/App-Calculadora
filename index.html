@@ -295,6 +295,34 @@ async function cargarDatos() {
     console.warn('Error cargando gobierno.json', err);
   }
 
+  try {
+  const govRes = await fetch('gobierno.json', { cache: 'no-store' });
+  if (govRes.ok) {
+    const govPack = await govRes.json();
+    const extras = Array.isArray(govPack.financieras) ? govPack.financieras : [];
+
+    extras.forEach(fin => upsertFinanciera(base.financieras, fin));
+  } else {
+    console.warn('No se pudo cargar gobierno.json (status)', govRes.status);
+  }
+} catch (err) {
+  console.warn('Error cargando gobierno.json', err);
+}
+
+try {
+  const vivaliaRes = await fetch('vivalia_snte51.json', { cache: 'no-store' });
+  if (vivaliaRes.ok) {
+    const vivaliaPack = await vivaliaRes.json();
+    const extras = Array.isArray(vivaliaPack.financieras) ? vivaliaPack.financieras : [];
+
+    extras.forEach(fin => upsertFinanciera(base.financieras, fin));
+  } else {
+    console.warn('No se pudo cargar vivalia_snte51.json (status)', vivaliaRes.status);
+  }
+} catch (err) {
+  console.warn('Error cargando vivalia_snte51.json', err);
+}
+
   DATA = base;
   window.DATA = DATA;
 

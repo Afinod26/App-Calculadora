@@ -271,8 +271,20 @@ async function cargarDatos() {
   try {
     const credRes = await fetch('credifiel_snte23.json', { cache: 'no-store' });
     if (credRes.ok) {
-      const credifielSNTE23 = await credRes.json();
-      upsertFinanciera(base.financieras, credifielSNTE23);
+      const data = await credRes.json();
+
+      // Soporta raíz { financieras: [...] }
+      if (data.financieras && Array.isArray(data.financieras)) {
+        data.financieras.forEach(fin => {
+          upsertFinanciera(base.financieras, fin);
+        });
+      }
+      // Compatibilidad: archivo con una financiera en raíz
+      else if (data && data.id) {
+        upsertFinanciera(base.financieras, data);
+      } else {
+        console.error('El archivo credifiel_snte23.json no tiene la estructura { financieras: [...] }');
+      }
     } else {
       console.warn('No se pudo cargar credifiel_snte23.json (status)', credRes.status);
     }
@@ -529,9 +541,24 @@ try {
   }
 
   // ====== Buscar monto máximo por capacidad ======
-  function buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad) {
+  function obtenerMontoMaximoPorEdad(fin, edad) {
+    const reglas = fin.reglas || {};
+    const rangos = reglas.monto_maximo_por_edad || [];
+
+    for (const rango of rangos) {
+      if (edad >= rango.edad_min && edad <= rango.edad_max) {
+        return rango.monto_maximo;
+      }
+    }
+
+    return reglas.monto_maximo_general || Infinity;
+  }
+
+  function buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad, edad = null) {
     if (!fin.tabla || !Array.isArray(fin.tabla)) return null;
     if (capacidad == null || !isFinite(capacidad)) return null;
+
+    const topePorEdad = (edad == null) ? Infinity : Number(obtenerMontoMaximoPorEdad(fin, Number(edad)));
 
     let mejor = null; // { monto, pagoQ }
 
@@ -543,6 +570,7 @@ try {
       const monto = Number(fila.monto);
 
       if (!isFinite(pagoQ) || !isFinite(monto)) continue;
+      if (isFinite(topePorEdad) && monto > topePorEdad) continue;
 
       // Si cabe en la capacidad, buscamos el monto más alto
       if (pagoQ <= capacidad) {
@@ -840,6 +868,23 @@ try {
           return;
         }
 
+        if (monto != null && edad != null) {
+          const montoMaximoEdad = obtenerMontoMaximoPorEdad(fin, edad);
+
+          if (monto > montoMaximoEdad) {
+            contenedor.innerHTML = `
+              <div class="result-item">
+                <span class="result-label">${fin.nombre}</span>
+                <span class="result-value">
+                  Para la edad capturada, el monto máximo permitido es ${money(montoMaximoEdad)}
+                </span>
+              </div>
+            `;
+            document.getElementById('results').classList.add('show');
+            return;
+          }
+        }
+
         // ✅ Validar tablas de edad/servicio ANTES de procesar plazos
         const motTabla = validaTablaEdadServicioCredifiel(fin, edad, servicio, plazo);
         if (motTabla) {
@@ -884,6 +929,17 @@ try {
           }
 
           if (monto != null) {
+            const topeMontoEdad = (edad == null) ? Infinity : Number(obtenerMontoMaximoPorEdad(fin, edad));
+            if (isFinite(topeMontoEdad) && Number(monto) > topeMontoEdad) {
+              html += `
+                <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
+                  <span class="result-value" style="color:#7f8c8d;font-weight:600; text-align:right;">Excede monto máximo por edad (${money(topeMontoEdad)})</span>
+                </div>`;
+              continue;
+            }
+
             // pago por monto exacto
             const pagoQ = buscarPago(fin, monto, String(p));
             if (pagoQ == null) {
@@ -903,7 +959,7 @@ try {
               </div>`;
           } else {
             // monto máximo por capacidad
-            const best = buscarMontoMaxPorCapacidad(fin, String(p), capacidad);
+            const best = buscarMontoMaxPorCapacidad(fin, String(p), capacidad, edad);
             if (!best) {
               html += `
                 <div class="result-item">
@@ -955,7 +1011,7 @@ try {
         // ===== MODO B: monto vacío -> calcular monto máximo con capacidad =====
         if (monto == null) {
           if (capacidad == null) continue; // sin capacidad no se puede calcular monto máximo
-          const best = buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad);
+          const best = buscarMontoMaxPorCapacidad(fin, plazoStr, capacidad, edad);
           if (!best) continue;
 
           montoUsado = best.monto;
@@ -966,6 +1022,12 @@ try {
           // Montos min/max
           if (fin.montoMin != null && monto < Number(fin.montoMin)) continue;
           if (fin.montoMax != null && monto > Number(fin.montoMax)) continue;
+
+          const topeMontoEdad = (edad == null) ? Infinity : Number(obtenerMontoMaximoPorEdad(fin, edad));
+          if (isFinite(topeMontoEdad) && Number(monto) > topeMontoEdad) {
+            addReject(fin, `Excede monto máximo por edad (${money(topeMontoEdad)})`);
+            continue;
+          }
 
           pagoQ = buscarPago(fin, monto, plazoStr);
           if (pagoQ == null) continue;

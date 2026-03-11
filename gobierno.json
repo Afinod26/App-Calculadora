@@ -20264,9 +20264,19 @@
             "96": 4983.33
           }
         }
-      ]
-    }
-  ]
+      ],
+      "reglas": {
+        "edad_max": 62,
+        "antiguedad_max_anios": 27,
+        "antiguedad_min_meses": 1,
+        "excepciones_perfil": {
+          "policia": {
+            "antiguedad_min_meses": 12
+          }
+        }
+        }
+      }
+      ] 
 }
   
     

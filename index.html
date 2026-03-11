@@ -321,6 +321,20 @@ try {
   console.warn('Error cargando vivalia_snte51.json', err);
 }
 
+try {
+  const saludCompraRes = await fetch('salud_compra.json', { cache: 'no-store' });
+  if (saludCompraRes.ok) {
+    const saludCompraPack = await saludCompraRes.json();
+    const extras = Array.isArray(saludCompraPack.financieras) ? saludCompraPack.financieras : [];
+
+    extras.forEach(fin => upsertFinanciera(base.financieras, fin));
+  } else {
+    console.warn('No se pudo cargar salud_compra.json (status)', saludCompraRes.status);
+  }
+} catch (err) {
+  console.warn('Error cargando salud_compra.json', err);
+}
+
   DATA = base;
   window.DATA = DATA;
 

@@ -25349,7 +25349,17 @@
   "convenios": [
      { "id": "snte23", "nombre": "SNTE 23", "estado": "puebla" },
     { "id": "snte51", "nombre": "SNTE 51", "estado": "puebla" },
-    { "id": "gobierno", "nombre": "Gobierno", "estado": "puebla" }
+    { "id": "gobierno", "nombre": "Gobierno", "estado": "puebla" },
+     {
+    "id": "salud",
+    "nombre": "Salud",
+    "estado": "puebla"
+  },
+  {
+    "id": "salud_compra_deuda",
+    "nombre": "Salud (compra)",
+    "estado": "puebla"
+  }
     
   ],
     "estados": [

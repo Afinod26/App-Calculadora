@@ -381,14 +381,11 @@ try {
 
     sel.innerHTML = '<option value="todas">Todas</option>';
 
-    const disponibles = filtrarFinancierasPorConvenio(DATA, convenioSel);
-
-    // Debug logging
-    console.table(disponibles.map(f => ({
-      id: f.id,
-      nombre: f.nombre,
-      convenios: getConvenios(f)
-    })));
+    const disponibles = DATA.financieras.filter(fin => {
+      // Si la financiera NO define convenios -> se asume que aplica a todos
+      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) return true;
+      return fin.convenios.includes(convenioSel);
+    });
 
     disponibles.forEach(fin => {
       const opt = document.createElement("option");

@@ -295,20 +295,6 @@ async function cargarDatos() {
     console.warn('Error cargando gobierno.json', err);
   }
 
-  try {
-  const govRes = await fetch('gobierno.json', { cache: 'no-store' });
-  if (govRes.ok) {
-    const govPack = await govRes.json();
-    const extras = Array.isArray(govPack.financieras) ? govPack.financieras : [];
-
-    extras.forEach(fin => upsertFinanciera(base.financieras, fin));
-  } else {
-    console.warn('No se pudo cargar gobierno.json (status)', govRes.status);
-  }
-} catch (err) {
-  console.warn('Error cargando gobierno.json', err);
-}
-
 try {
   const vivaliaRes = await fetch('vivalia_snte51.json', { cache: 'no-store' });
   if (vivaliaRes.ok) {
@@ -382,9 +368,9 @@ try {
     sel.innerHTML = '<option value="todas">Todas</option>';
 
     const disponibles = DATA.financieras.filter(fin => {
-      // Si la financiera NO define convenios -> se asume que aplica a todos
-      if (!Array.isArray(fin.convenios) || fin.convenios.length === 0) return true;
-      return fin.convenios.includes(convenioSel);
+      const convenios = getConvenios(fin);
+      if (convenios.length === 0) return true;
+      return convenios.includes(convenioSel);
     });
 
     disponibles.forEach(fin => {
@@ -394,7 +380,44 @@ try {
       sel.appendChild(opt);
     });
 
-    sel.value = "todas"; // por defecto: todas
+    sel.value = "todas";
+  }
+
+  function norm(s) {
+    return String(s || '').trim().toLowerCase();
+  }
+
+  function poblarFinancieras() {
+    const selConvenio = document.getElementById('convenio');
+    const selEstado = document.getElementById('estado');
+    const selFinancieras = document.getElementById('selFinancieras');
+
+    const convenioSeleccionado = selConvenio ? selConvenio.value : '';
+    const estadoSeleccionado = selEstado ? selEstado.value : '';
+
+    selFinancieras.innerHTML = '<option value="">Selecciona una financiera</option>';
+
+    if (!DATA?.financieras || !Array.isArray(DATA.financieras)) return;
+    if (!convenioSeleccionado) return;
+
+    const financierasFiltradas = DATA.financieras.filter(fin => {
+      const coincideConvenio = norm(fin.convenio) === norm(convenioSeleccionado);
+
+      const coincideEstado =
+        !estadoSeleccionado ||
+        norm(estadoSeleccionado) === 'todos' ||
+        !fin.estado ||
+        norm(fin.estado) === norm(estadoSeleccionado);
+
+      return coincideConvenio && coincideEstado;
+    });
+
+    financierasFiltradas.forEach(fin => {
+      const option = document.createElement('option');
+      option.value = fin.nombre || fin.financiera || '';
+      option.textContent = fin.nombre || fin.financiera || 'Sin nombre';
+      selFinancieras.appendChild(option);
+    });
   }
 
 
@@ -619,6 +642,47 @@ try {
     return null;
   }
 
+  function bucketServicioMujer(servicio) {
+    if (servicio >= 28) return "28_o_mas";
+    if (servicio >= 27) return "27";
+    if (servicio >= 26) return "26";
+    if (servicio >= 25) return "25";
+    if (servicio >= 24) return "24";
+    if (servicio >= 23) return "23";
+    if (servicio >= 22) return "22";
+    if (servicio >= 21) return "21";
+    if (servicio >= 20) return "20";
+    if (servicio >= 8) return "19_a_8";
+    return null;
+  }
+
+  function validaMatrizMujerVivalia(fin, edad, servicio, plazo) {
+    if (edad == null || servicio == null || plazo == null) return null;
+
+    // aplica solo a Vivalia
+    if (fin.id !== "vivalia_snte51" && fin.id !== "vivalia_gobierno") return null;
+
+    const mm = fin.reglas?.matrizMujer;
+    if (!mm?.aplica) return null;
+
+    const bucket = bucketServicioMujer(Number(servicio));
+    if (!bucket) return null;
+
+    const fila = mm.maxPlazoPorEdadServicio?.[bucket];
+    if (!fila) return null;
+
+    const maxPlazo = fila[String(Number(edad))];
+
+    // si esa edad no está en la matriz, no bloquea
+    if (maxPlazo == null) return null;
+
+    if (Number(plazo) > Number(maxPlazo)) {
+      return `No cumple matriz de mujeres: para ${edad} años de edad y ${servicio} años de servicio, el plazo máximo es ${maxPlazo}Q`;
+    }
+
+    return null;
+  }
+
   // ====== Evento principal ======
   const form = document.getElementById('loanForm');
   if (!form) {
@@ -668,25 +732,23 @@ try {
       function motivoReglas(fin, edad, servicio, plazo) {
         const r = fin.reglas || {};
 
-        // 1️⃣ TABLA EDAD–SERVICIO (SOLO CREDIFIEL)
         const motTabla = validaTablaEdadCredifiel(fin, edad, servicio);
         if (motTabla) return motTabla;
 
-        // 1️⃣.5️⃣ TABLA SERVICIO–EDAD (SOLO CREDIFIEL)
         const motTablaServicio = validaTablaEdadServicioCredifiel(fin, edad, servicio, plazo);
         if (motTablaServicio) return motTablaServicio;
 
-        // 2️⃣ EDAD MÍNIMA
+        const motMatrizVivalia = validaMatrizMujerVivalia(fin, edad, servicio, plazo);
+        if (motMatrizVivalia) return motMatrizVivalia;
+
         if (r.edad_min != null && edad != null && edad < r.edad_min) {
           return "Edad mínima no cumple";
         }
 
-        // 3️⃣ EDAD MÁXIMA (SOLO SI EXISTE)
         if (r.edad_max != null && edad != null && edad > r.edad_max) {
           return "Edad máxima excedida";
         }
 
-        // 4️⃣ EDAD AL FINALIZAR
         if (r.edad_max_al_finalizar != null && edad != null && plazo != null) {
           const edadFinal = edad + (plazo / 24);
           if (edadFinal > r.edad_max_al_finalizar) {
@@ -694,7 +756,6 @@ try {
           }
         }
 
-        // 5️⃣ ANTIGÜEDAD
         if (r.antiguedad_min_anios != null && servicio != null && servicio < r.antiguedad_min_anios) {
           return "Antigüedad insuficiente";
         }
@@ -1003,10 +1064,9 @@ try {
     try {
       await cargarDatos(); // aquí se llena el select de convenios
       
-      // ✅ Actualizar financieras cuando cambia el convenio
-      document.getElementById("convenio").addEventListener("change", () => {
-        poblarSelectorFinancieras();
-      });
+      // ✅ Actualizar financieras cuando cambia el convenio o estado
+      document.getElementById('convenio').addEventListener('change', poblarSelectorFinancieras);
+      document.getElementById('estado').addEventListener('change', poblarSelectorFinancieras);
     } catch (err) {
       console.error(err);
       alert('Error cargando data.json');

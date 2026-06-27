@@ -187,7 +187,7 @@
     
     <form id="loanForm">
       <div class="form-group">
-        <label for="capacity">Capacidad de pago por quincena (MXN)</label>
+        <label for="capacity" id="capacityLabel">Capacidad de pago por periodo (MXN)</label>
         <input type="number" id="capacity" placeholder="(Opcional) 1500" min="0">
       </div>
 
@@ -198,9 +198,11 @@
       </div>
 
       <div class="form-group">
-        <label for="term">Plazo (quincenas)</label>
-        <input type="number" id="term" placeholder="24" min="1">
-        <p class="hint">Tip: usa plazos que existan en tu tabulador (ej. 12, 18, 24, 30...).</p>
+        <label for="term" id="termLabel">Plazo</label>
+        <select id="term"
+          style="width:100%;padding:12px;border:2px solid #ecf0f1;border-radius:6px;font-size:16px;">
+        </select>
+        <p class="hint" id="termHint">Selecciona un plazo disponible.</p>
       </div>
 
       <div class="form-group">
@@ -258,6 +260,27 @@ function upsertFinanciera(arr, obj) {
   const i = arr.findIndex(x => x.id === obj.id);
   if (i >= 0) arr[i] = obj;     // reemplaza
   else arr.push(obj);           // inserta
+}
+
+function upsertConvenio(arr, obj) {
+  const i = arr.findIndex(x => x.id === obj.id);
+  if (i >= 0) arr[i] = obj;     // reemplaza
+  else arr.push(obj);           // inserta
+}
+
+async function mezclarPack(base, archivo) {
+  try {
+    const res = await fetch(archivo, { cache: 'no-store' });
+    if (res.ok) {
+      const pack = await res.json();
+      const extras = Array.isArray(pack.financieras) ? pack.financieras : [];
+      extras.forEach(fin => upsertFinanciera(base.financieras, fin));
+    } else {
+      console.warn(`No se pudo cargar ${archivo} (status)`, res.status);
+    }
+  } catch (err) {
+    console.warn(`Error cargando ${archivo}`, err);
+  }
 }
 
 async function cargarDatos() {
@@ -335,6 +358,32 @@ try {
   console.warn('Error cargando salud_compra.json', err);
 }
 
+try {
+  const imssRes = await fetch('imss.json', { cache: 'no-store' });
+
+  if (imssRes.ok) {
+    const imssPack = await imssRes.json();
+
+    // Asegura que existan los arreglos base
+    base.convenios = Array.isArray(base.convenios) ? base.convenios : [];
+    base.financieras = Array.isArray(base.financieras) ? base.financieras : [];
+
+    // Mezcla convenios de imss.json
+    const conveniosExtras = Array.isArray(imssPack.convenios) ? imssPack.convenios : [];
+    conveniosExtras.forEach(conv => upsertConvenio(base.convenios, conv));
+
+    // Mezcla financieras de imss.json
+    const financierasExtras = Array.isArray(imssPack.financieras) ? imssPack.financieras : [];
+    financierasExtras.forEach(fin => upsertFinanciera(base.financieras, fin));
+
+  } else {
+    console.warn('No se pudo cargar imss.json (status)', imssRes.status);
+  }
+} catch (err) {
+  console.warn('Error cargando imss.json', err);
+}
+
+
   DATA = base;
   window.DATA = DATA;
 
@@ -347,10 +396,11 @@ try {
       throw new Error('data.json no tiene "convenios": [ ... ]');
     }
 
-    // ✅ AQUI estaba faltando:
+    // ✅ Poblar selectores
+    poblarEstados();
     poblarConvenios();
-    poblarEstados();           // o poblarConveniosPorEstado si ya la usas
     poblarSelectorFinancieras();
+    poblarSelectorPlazos();
 
   }
 
@@ -414,6 +464,7 @@ try {
     });
 
     sel.value = "todas";
+    poblarSelectorPlazos();
   }
 
   function norm(s) {
@@ -512,6 +563,85 @@ try {
     return [];
   }
 
+  // ====== Unidad de plazo dinámica: quincenas / meses ======
+  function getConvenioActual() {
+    const convenioSel = document.getElementById("convenio")?.value ?? "";
+    return (DATA.convenios || []).find(c => c.id === convenioSel) || null;
+  }
+
+  function getUnidadPlazo(fin = null) {
+    const convenio = getConvenioActual();
+
+    // prioridad: financiera > convenio > default
+    return fin?.unidad_plazo || convenio?.unidad_plazo || "quincenas";
+  }
+
+  function textoPeriodo(fin = null) {
+    return getUnidadPlazo(fin) === "meses" ? "mes" : "quincena";
+  }
+
+  function textoPlazo(plazo, fin = null) {
+    const unidad = getUnidadPlazo(fin);
+    return unidad === "meses" ? `${plazo} meses` : `${plazo}Q`;
+  }
+
+  function calcularEdadFinal(edad, plazo, fin = null) {
+    const unidad = getUnidadPlazo(fin);
+    return unidad === "meses"
+      ? edad + (plazo / 12)
+      : edad + (plazo / 24);
+  }
+
+  function poblarSelectorPlazos() {
+    const selPlazo = document.getElementById("term");
+    const label = document.getElementById("termLabel");
+    const hint = document.getElementById("termHint");
+    const capacityLabel = document.getElementById("capacityLabel");
+
+    if (!selPlazo || !DATA) return;
+
+    const convenioSel = document.getElementById("convenio")?.value ?? "";
+    const finSel = document.getElementById("selFinancieras")?.value ?? "todas";
+
+    const disponibles = filtrarFinancierasPorConvenio(DATA, convenioSel);
+    const financierasBase = finSel === "todas"
+      ? disponibles
+      : disponibles.filter(f => f.id === finSel);
+
+    if (!financierasBase.length) {
+      selPlazo.innerHTML = '<option value="">Sin plazos</option>';
+      if (label) label.textContent = "Plazo";
+      if (hint) hint.textContent = "No hay plazos disponibles.";
+      return;
+    }
+
+    const unidad = getUnidadPlazo(financierasBase[0]);
+    const unidadTexto = unidad === "meses" ? "meses" : "quincenas";
+    const periodoTexto = unidad === "meses" ? "mes" : "quincena";
+
+    if (label) label.textContent = `Plazo (${unidadTexto})`;
+    if (hint) hint.textContent = `Selecciona un plazo en ${unidadTexto}.`;
+    if (capacityLabel) capacityLabel.textContent = `Capacidad de pago por ${periodoTexto} (MXN)`;
+
+    const plazos = [
+      ...new Set(
+        financierasBase
+          .flatMap(fin => getPlazosPermitidos(fin))
+          .map(Number)
+          .filter(n => Number.isFinite(n))
+      )
+    ].sort((a, b) => a - b);
+
+    selPlazo.innerHTML = '<option value="">Todos los plazos</option>';
+
+    for (const p of plazos) {
+      const opt = document.createElement("option");
+      opt.value = String(p);
+      opt.textContent = textoPlazo(p, financierasBase[0]);
+      selPlazo.appendChild(opt);
+    }
+  }
+
   // ====== Tabulador fijo: (monto exacto + plazo exacto => pago quincenal) ======
   function buscarPago(fin, monto, plazoStr) {
     if (!fin.tabla || !Array.isArray(fin.tabla)) return null;
@@ -536,12 +666,12 @@ try {
       if (!r.edadIncluyePlazo) {
         if (r.edadMax != null && edad > r.edadMax) return false;
       } else if (r.edadMax != null) {
-        const edadAlFinal = edad + (plazoQuincenas / 24);
+        const edadAlFinal = calcularEdadFinal(edad, plazoQuincenas, fin);
         if (edadAlFinal > r.edadMax) return false;
       }
 
       // Validación: edad actual + duración del crédito (en años) ≤ 67
-      const edadAlFinal = edad + (plazoQuincenas / 24);
+      const edadAlFinal = calcularEdadFinal(edad, plazoQuincenas, fin);
       if (edadAlFinal > 67) return false;
     }
 
@@ -799,7 +929,7 @@ try {
         }
 
         if (r.edad_max_al_finalizar != null && edad != null && plazo != null) {
-          const edadFinal = edad + (plazo / 24);
+          const edadFinal = calcularEdadFinal(edad, plazo, fin);
           if (edadFinal > r.edad_max_al_finalizar) {
             return "Edad al finalizar excede límite";
           }
@@ -872,7 +1002,7 @@ try {
           contenedor.innerHTML = `
             <div class="result-item">
               <span class="result-label">${fin.nombre}</span>
-              <span class="result-value">Plazo ${plazo}Q no disponible. Plazos: ${plazos.join(", ")}Q</span>
+              <span class="result-value">Plazo ${textoPlazo(plazo, fin)} no disponible. Plazos: ${plazos.map(p => textoPlazo(p, fin)).join(", ")}</span>
             </div>`;
           document.getElementById('results').classList.add('show');
           return;
@@ -923,7 +1053,7 @@ try {
           <div class="result-item" style="flex-direction:column; align-items:flex-start;">
             <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
               <span class="result-label">${fin.nombre}</span>
-              <span class="result-value">Plazos disponibles: ${plazos.join(", ")}Q</span>
+              <span class="result-value">Plazos disponibles: ${plazos.map(p => textoPlazo(p, fin)).join(", ")}</span>
             </div>
           </div>
         `;
@@ -934,7 +1064,7 @@ try {
           if (motTabla) {
             html += `
               <div class="result-item">
-                <span class="result-label">${p}Q</span>
+                <span class="result-label">${textoPlazo(p, fin)}</span>
                 <span class="result-value" style="color:#7f8c8d;font-weight:600;">${motTabla}</span>
               </div>`;
             continue;
@@ -943,7 +1073,7 @@ try {
           if (mot) {
             html += `
               <div class="result-item">
-                <span class="result-label">${p}Q</span>
+                <span class="result-label">${textoPlazo(p, fin)}</span>
                 <span class="result-value" style="color:#7f8c8d;font-weight:600;">${mot}</span>
               </div>`;
             continue;
@@ -954,7 +1084,7 @@ try {
             if (isFinite(topeMontoEdad) && Number(monto) > topeMontoEdad) {
               html += `
                 <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span class="result-label" style="width:70px;">${textoPlazo(p, fin)}</span>
                   <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
                   <span class="result-value" style="color:#7f8c8d;font-weight:600; text-align:right;">Excede monto máximo por edad (${money(topeMontoEdad)})</span>
                 </div>`;
@@ -966,7 +1096,7 @@ try {
             if (pagoQ == null) {
               html += `
                 <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span class="result-label" style="width:70px;">${textoPlazo(p, fin)}</span>
                   <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
                   <span class="result-value" style="color:#7f8c8d;font-weight:600; text-align:right;">No existe en tabla</span>
                 </div>`;
@@ -974,9 +1104,9 @@ try {
             }
             html += `
               <div class="result-item" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-                <span class="result-label" style="width:70px;">${p}Q</span>
+                <span class="result-label" style="width:70px;">${textoPlazo(p, fin)}</span>
                 <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
-                <span class="result-value" style="text-align:right;">${money(pagoQ)} / quincena</span>
+                <span class="result-value" style="text-align:right;">${money(pagoQ)} / ${textoPeriodo(fin)}</span>
               </div>`;
           } else {
             // monto máximo por capacidad
@@ -984,7 +1114,7 @@ try {
             if (!best) {
               html += `
                 <div class="result-item">
-                  <span class="result-label">${p}Q</span>
+                  <span class="result-label">${textoPlazo(p, fin)}</span>
                   <span class="result-value" style="color:#7f8c8d;font-weight:600;">No alcanza monto mínimo</span>
                 </div>`;
               continue;
@@ -992,9 +1122,9 @@ try {
             html += `
               <div class="result-item" style="flex-direction:column; align-items:flex-start;">
                 <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
-                  <span class="result-label" style="width:70px;">${p}Q</span>
+                  <span class="result-label" style="width:70px;">${textoPlazo(p, fin)}</span>
                   <span style="flex:1; text-align:center; font-weight:700; opacity:.85;">${fin.nombre}</span>
-                  <span class="result-value" style="text-align:right;">${money(best.pagoQ)} / quincena</span>
+                  <span class="result-value" style="text-align:right;">${money(best.pagoQ)} / ${textoPeriodo(fin)}</span>
                 </div>
                 <div class="max-loan-wrap">
                   <div class="max-loan">Monto máximo: ${money(best.monto)}</div>
@@ -1088,7 +1218,7 @@ try {
             <div class="result-item" style="flex-direction:column; align-items:flex-start;">
               <div style="width:100%; display:flex; justify-content:space-between; gap:14px; align-items:center;">
                 <span class="result-label">${r.fin.nombre ?? 'Financiera'}</span>
-                <span class="result-value">${money(r.pagoQ)} / quincena ${badge}</span>
+                <span class="result-value">${money(r.pagoQ)} / ${textoPeriodo(r.fin)} ${badge}</span>
               </div>
 
               ${
@@ -1096,12 +1226,12 @@ try {
                   ? `
                     <div class="max-loan-wrap">
                       <div class="max-loan">Monto máximo: ${money(r.montoUsado)}</div>
-                      <div class="max-loan-sub">Plazo: ${plazo}Q · Con capacidad: ${capacidad == null ? '-' : money(capacidad)}</div>
+                      <div class="max-loan-sub">Plazo: ${textoPlazo(plazo, fin)} · Con capacidad: ${capacidad == null ? '-' : money(capacidad)}</div>
                     </div>
                   `
                   : `
                     <div class="hint" style="margin-top:6px;">
-                      Monto evaluado: <b>${money(r.montoUsado)}</b> — Plazo: <b>${plazo}Q</b>
+                      Monto evaluado: <b>${money(r.montoUsado)}</b> — Plazo: <b>${textoPlazo(plazo, fin)}</b>
                     </div>
                   `
               }
@@ -1147,9 +1277,21 @@ try {
     try {
       await cargarDatos(); // aquí se llena el select de convenios
       
-      // ✅ Actualizar financieras cuando cambia el convenio o estado
-      document.getElementById('convenio').addEventListener('change', poblarSelectorFinancieras);
-      document.getElementById('estado').addEventListener('change', poblarSelectorFinancieras);
+      // ✅ Actualizar financieras y plazos cuando cambia convenio/estado/financiera
+      document.getElementById('convenio').addEventListener('change', () => {
+        poblarSelectorFinancieras();
+        poblarSelectorPlazos();
+      });
+
+      document.getElementById('estado').addEventListener('change', () => {
+        poblarConvenios();
+        poblarSelectorFinancieras();
+        poblarSelectorPlazos();
+      });
+
+      document.getElementById('selFinancieras').addEventListener('change', () => {
+        poblarSelectorPlazos();
+      });
     } catch (err) {
       console.error(err);
       alert('Error cargando data.json');

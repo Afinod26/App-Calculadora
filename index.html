@@ -399,6 +399,13 @@ try {
       return convenios.includes(convenioSel);
     });
 
+    // Debug logging
+    console.table(disponibles.map(f => ({
+      id: f.id,
+      nombre: f.nombre,
+      convenios: f.convenios
+    })));
+
     disponibles.forEach(fin => {
       const opt = document.createElement("option");
       opt.value = fin.id;

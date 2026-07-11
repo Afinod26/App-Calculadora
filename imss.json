@@ -5,8 +5,7 @@
     "nombre": "IMSS",
     "estadoDefault": "puebla",
     "fuente": "IMSS MI DINERITO.pdf",
-    "version": 1,
-    "notas": "Pack escalable para agregar más financieras/tablas del convenio IMSS. La tabla original del PDF está expresada en meses."
+    "version": 1
   },
   "convenios": [
     {

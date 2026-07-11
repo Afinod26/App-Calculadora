@@ -383,6 +383,34 @@ try {
   console.warn('Error cargando imss.json', err);
 }
 
+try {
+  const imssBienestarRes = await fetch('imss_bienestar.json', { cache: 'no-store' });
+
+  if (imssBienestarRes.ok) {
+    const imssBienestarPack = await imssBienestarRes.json();
+
+    base.convenios = Array.isArray(base.convenios) ? base.convenios : [];
+    base.financieras = Array.isArray(base.financieras) ? base.financieras : [];
+
+    const conveniosExtras = Array.isArray(imssBienestarPack.convenios)
+      ? imssBienestarPack.convenios
+      : [];
+
+    conveniosExtras.forEach(conv => upsertConvenio(base.convenios, conv));
+
+    const financierasExtras = Array.isArray(imssBienestarPack.financieras)
+      ? imssBienestarPack.financieras
+      : [];
+
+    financierasExtras.forEach(fin => upsertFinanciera(base.financieras, fin));
+
+  } else {
+    console.warn('No se pudo cargar imss_bienestar.json (status)', imssBienestarRes.status);
+  }
+} catch (err) {
+  console.warn('Error cargando imss_bienestar.json', err);
+}
+
 
   DATA = base;
   window.DATA = DATA;

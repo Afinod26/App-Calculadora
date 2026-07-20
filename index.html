@@ -320,8 +320,15 @@ async function cargarDatos() {
     const govRes = await fetch('gobierno.json', { cache: 'no-store' });
     if (govRes.ok) {
       const govPack = await govRes.json();
-      const extras = Array.isArray(govPack.financieras) ? govPack.financieras : [];
 
+      base.convenios = Array.isArray(base.convenios) ? base.convenios : [];
+
+      // Mezcla convenios de gobierno.json (si existen)
+      const conveniosExtras = Array.isArray(govPack.convenios) ? govPack.convenios : [];
+      conveniosExtras.forEach(conv => upsertConvenio(base.convenios, conv));
+
+      // Mezcla financieras de gobierno.json
+      const extras = Array.isArray(govPack.financieras) ? govPack.financieras : [];
       extras.forEach(fin => upsertFinanciera(base.financieras, fin));
     } else {
       console.warn('No se pudo cargar gobierno.json (status)', govRes.status);

@@ -68574,11 +68574,7 @@
       "nombre": "Gobierno",
       "estado": "puebla"
     },
-    {
-      "id": "gobierno_compra",
-      "nombre": "Gobierno (compra)",
-      "estado": "puebla"
-    },
+    
     {
       "id": "salud",
       "nombre": "Salud",

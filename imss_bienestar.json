@@ -3629,31 +3629,13 @@
       "montoMax": 200000,
       "monto_min": 3000,
       "monto_max": 200000,
-      "plazosPermitidos": [
-        48,
-        72,
-        96
-      ],
-      "plazos_permitidos": [
-        48,
-        72,
-        96
-      ],
-      "reglas": {
-        "edad_min": null,
-        "edad_max": null,
-        "edad_max_al_finalizar": null,
-        "antiguedad_min_anios": null,
-        "antiguedad_min_meses": null,
-        "monto_min": 3000,
-        "monto_max": 200000,
         "plazos_quincenas": [
           48,
           72,
           96,
           120
         ]
-      },
+      ,
       "tabla": [
         {
           "monto": 3000,
